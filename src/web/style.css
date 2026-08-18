@@ -1,0 +1,858 @@
+/* Styling follows Apple's Human Interface Guidelines: the system font stack,
+   the semantic colour roles (label / secondaryLabel / separator / fill), an
+   8-point spacing rhythm, standard segmented controls, and materials that
+   adapt to light and dark appearance. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Light appearance */
+  --bg: #f2f2f7;             /* systemGroupedBackground */
+  --bg-elevated: #ffffff;    /* secondarySystemGroupedBackground */
+  --label: #1d1d1f;
+  --label-2: rgba(60, 60, 67, 0.6);
+  --label-3: rgba(60, 60, 67, 0.32);
+  --separator: rgba(60, 60, 67, 0.2);
+  --fill: rgba(120, 120, 128, 0.12);
+  --fill-strong: rgba(120, 120, 128, 0.2);
+  --accent: #007aff;
+  --green: #34c759;
+  --orange: #ff9500;
+  --red: #ff3b30;
+  --grey: #8e8e93;
+  --stage: #0b0e14;
+
+  --radius-l: 14px;
+  --radius-m: 10px;
+  --radius-s: 7px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.1);
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+          "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Dark appearance.
+   Declared once and applied in two places: through the system preference when
+   no explicit choice has been made, and through `data-theme` when the viewer
+   picks one. The media query is guarded so choosing Light still wins on a
+   machine set to dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000;
+    --bg-elevated: #1c1c1e;
+    --label: #f5f5f7;
+    --label-2: rgba(235, 235, 245, 0.6);
+    --label-3: rgba(235, 235, 245, 0.3);
+    --separator: rgba(84, 84, 88, 0.6);
+    --fill: rgba(118, 118, 128, 0.24);
+    --fill-strong: rgba(118, 118, 128, 0.36);
+    --accent: #0a84ff;
+    --green: #30d158;
+    --orange: #ff9f0a;
+    --red: #ff453a;
+    --grey: #98989d;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* `color-scheme` is what native widgets follow - the pop-up list a <select>
+   opens, the date picker, scrollbars. It has to track the chosen theme, not the
+   operating system's: picking Dark on a light machine left the list painting
+   itself white while its text inherited the page's near-white label colour, so
+   the layer names were invisible. */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --bg-elevated: #1c1c1e;
+  --label: #f5f5f7;
+  --label-2: rgba(235, 235, 245, 0.6);
+  --label-3: rgba(235, 235, 245, 0.3);
+  --separator: rgba(84, 84, 88, 0.6);
+  --fill: rgba(118, 118, 128, 0.24);
+  --fill-strong: rgba(118, 118, 128, 0.36);
+  --accent: #0a84ff;
+  --green: #30d158;
+  --orange: #ff9f0a;
+  --red: #ff453a;
+  --grey: #98989d;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--label);
+  font: 400 14px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+}
+
+/* ---------------------------------------------------------------- toolbar */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px 10px;
+  border-bottom: 0.5px solid var(--separator);
+  background: var(--bg-elevated);
+}
+
+/* Logo colours are their own tokens: the mark sits on the toolbar in both
+   appearances and needs a disc that reads against each, which the page's
+   text and fill roles do not give. */
+:root {
+  --logo-hi: #4aa3ff;
+  --logo-lo: #0a4d9c;
+  --logo-scan: rgba(255, 255, 255, 0.72);
+  --logo-edge: rgba(255, 255, 255, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --logo-hi: #5ab0ff;
+    --logo-lo: #0b3f80;
+    --logo-scan: rgba(255, 255, 255, 0.8);
+    --logo-edge: rgba(255, 255, 255, 0.34);
+  }
+}
+
+:root[data-theme="dark"] {
+  --logo-hi: #5ab0ff;
+  --logo-lo: #0b3f80;
+  --logo-scan: rgba(255, 255, 255, 0.8);
+  --logo-edge: rgba(255, 255, 255, 0.34);
+}
+
+.logo {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  margin-right: -4px;
+}
+
+.titles h1 {
+  margin: 0;
+  font-size: 22px;          /* Title 2 */
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.subtitle {
+  margin: 1px 0 0;
+  font-size: 12px;          /* Caption 1 */
+  color: var(--label-2);
+}
+
+.status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--fill);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label-2);
+  white-space: nowrap;
+}
+
+.status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--grey);
+  flex: none;
+  transition: background .3s ease;
+}
+
+.status.fresh .dot { background: var(--green); }
+.status.recent .dot { background: var(--orange); }
+.status.stale .dot { background: var(--red); }
+.status.fresh  { color: var(--label); }
+
+/* --------------------------------------------------------------- controls */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  padding: 12px 24px;
+  border-bottom: 0.5px solid var(--separator);
+  background: var(--bg-elevated);
+}
+
+.field { display: flex; align-items: center; gap: 10px; }
+
+.field-label {
+  font-size: 11px;              /* Caption 2, uppercase */
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--label-3);
+}
+
+/* Pop-up button.
+   The guidelines put a small number of similar-width options in a segmented
+   control and a longer list in a pop-up. Nine layers and eight intervals are a
+   list: as segments they ran to 989 and 495 pixels, dominating the toolbar and
+   making the wide one look more important than everything beside it. */
+.popup {
+  appearance: none;
+  border: 0.5px solid var(--separator);
+  border-radius: var(--radius-s);
+  background: var(--bg-elevated);
+  color: var(--label);
+  font: 500 13px/1 var(--font);
+  padding: 7px 26px 7px 10px;
+  cursor: pointer;
+  /* The chevron is drawn rather than fetched, so the page stays self-contained
+     and it follows the label colour in both appearances. */
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 12px center, right 7px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  box-shadow: var(--shadow-1);
+}
+
+.popup:hover { background-color: var(--fill); }
+.popup:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Named explicitly rather than inherited. The list is drawn by the platform,
+   and a browser that does not honour `color-scheme` would otherwise put the
+   page's label colour on the platform's background. */
+.popup option {
+  background-color: var(--bg-elevated);
+  color: var(--label);
+}
+
+/* Pushes what follows to the trailing edge, so settings and Save sit apart
+   from the things that change often. */
+.spacer { flex: 1 1 auto; min-width: 0; }
+
+/* Disclosure for settings that are chosen once and then left alone. Keeping
+   them out of the toolbar is what returns the room to the image. */
+.menu { position: relative; }
+
+.menubutton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-s);
+  background: var(--fill);
+  color: var(--label);
+  font: 500 13px/1 var(--font);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.menubutton::-webkit-details-marker { display: none; }
+.menubutton:hover { background: var(--fill-strong); }
+.menubutton svg { fill: currentColor; opacity: .75; }
+.menu[open] .menubutton { background: var(--fill-strong); }
+
+.menupanel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 260px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: var(--radius-m);
+  border: 0.5px solid var(--separator);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-2);
+}
+
+.menurow { display: flex; flex-direction: column; gap: 6px; }
+
+.menulabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--label-3);
+}
+
+/* ------------------------------------------------------------- calendar */
+
+.cal { display: flex; flex-direction: column; gap: 8px; }
+
+.calhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calmonth {
+  min-width: 132px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.calnav {
+  appearance: none;
+  border: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-s);
+  background: var(--fill);
+  color: var(--label);
+  font: 600 15px/1 var(--font);
+  cursor: pointer;
+}
+
+.calnav:hover:not(:disabled) { background: var(--fill-strong); }
+.calnav:disabled { opacity: .3; cursor: default; }
+
+/* Seven columns of fixed width, so the weeks line up and the grid does not
+   reflow as the month changes length. */
+.calgrid {
+  display: grid;
+  grid-template-columns: repeat(7, 34px);
+  gap: 2px;
+}
+
+.calwd {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--label-3);
+}
+
+.calday {
+  appearance: none;
+  border: 0;
+  height: 30px;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--label-3);
+  font: 500 12px/1 var(--font);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  position: relative;
+}
+
+/* A day the receiver actually holds. Everything else stays flat and unclickable
+   so the shape of what is available reads at a glance. */
+.calday.has {
+  background: var(--fill);
+  color: var(--label);
+  cursor: pointer;
+}
+
+.calday.has:hover { background: var(--fill-strong); }
+
+/* How much of the day is there. Reception gaps leave days with a handful of
+   slots rather than none, and a half-empty day is worth knowing about before
+   you pick it. */
+.calday.has::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: var(--fill-level, 1);
+}
+
+/* Inside the chosen span. */
+.calday.in {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--label);
+}
+
+/* The two ends of it. */
+.calday.edge {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.calday.edge::after { background: #fff; }
+
+/* Shown while the second end is still being chosen. */
+.calday.preview {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Anchored under its own button rather than docked in a band. The panel is
+   only as wide as seven day columns need. */
+.datemenu[hidden] { display: none; }
+
+/* Opens to the right of its button, not to the left.
+   `.menupanel` hangs off the trailing edge, which is right for the Display
+   button because that sits at the trailing edge of the toolbar. The date
+   button sits at the leading edge, so the same rule threw the calendar off the
+   left of the window - month header, navigation and four of the seven day
+   columns were simply not on screen. */
+.calpanel {
+  left: 0;
+  right: auto;
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.calfoot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 20px;
+}
+
+.calclear {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 500 12px/1 var(--font);
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.calclear[hidden] { display: none; }
+/* The calendar shows UTC days, and nothing else on the page implies a zone,
+   so the header names it. */
+.tzhint {
+  margin-left: 3px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--fill);
+  color: var(--label-2);
+  letter-spacing: 0.3px;
+}
+
+.rangenote {
+  font-size: 12px;
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.rangenote.bad { color: var(--red); }
+
+/* Segmented control */
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--radius-s);
+  background: var(--fill);
+  gap: 2px;
+}
+
+.segmented button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--label);
+  font: 500 13px/1 var(--font);
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .18s ease, color .18s ease, transform .1s ease;
+}
+
+.segmented button:hover:not(:disabled) { background: var(--fill); }
+.segmented button:active:not(:disabled) { transform: scale(0.97); }
+
+/* An option that does not apply in the current mode - Range under Live, which
+   has no timeline for a span to sit on. Dimmed rather than removed, so the
+   control keeps its shape and the option stays discoverable. */
+.segmented button:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.segmented button.on {
+  background: var(--bg-elevated);
+  color: var(--label);
+  box-shadow: var(--shadow-1);
+  font-weight: 600;
+}
+
+/* Tighter, for the speed control sitting inside the play bar. */
+.segmented.compact button { padding: 5px 8px; font-size: 12px; }
+
+/* Multi-select group reads as toggles, so selection uses the accent colour. */
+.segmented.multi button.on {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: none;
+}
+
+/* ------------------------------------------------------------------- main */
+
+main {
+  display: flex;
+  gap: 16px;
+  padding: 16px 24px;
+  flex: 1;
+  min-height: 0;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 340px;
+  border-radius: var(--radius-l);
+  background: var(--stage);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fill the stage but keep the map's own aspect ratio; the browser letterboxes
+   rather than stretching the geography. `max-width` alone would leave a
+   smaller-than-stage render sitting un-scaled in the middle. */
+#frame {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Wide enough for the longest thing it ever says - "Rendering 120 / 120 - 3 min
+   left" - so the timeline beside it does not shift as the text changes. The
+   shorter states ("Play", "Playing 0.25x") sit inside the same box. */
+.playlabel {
+  min-width: 232px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The play button spins while it renders the window, before playback starts. */
+.play.busy { animation: pulse 1.1s ease-in-out infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+/* Where you are, drawn in the page rather than baked into the render so it
+   costs nothing and never fragments the server-side image cache. */
+.marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  pointer-events: none;
+}
+
+.marker span {
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin: 2px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 1px 5px rgba(0, 0, 0, 0.6);
+}
+
+.marker[hidden] { display: none; }
+
+/* Shown for a moment when the loop wraps, so a repeat is not mistaken for new
+   weather arriving. */
+.loopbadge {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translate(-50%, -6px);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+.loopbadge.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* The image dims briefly at the wrap, which reads even at a glance. */
+.stage.looping #frame { filter: brightness(0.55); transition: filter .12s ease; }
+.stage #frame { transition: filter .35s ease; }
+
+
+/* Live mode has no timeline to scrub. */
+.playbar.live .scrubwrap,
+.playbar.live .counter { opacity: .3; pointer-events: none; }
+.playbar.live .play { background: var(--red); }
+
+.segmented button.busy { opacity: .55; cursor: progress; }
+
+.empty {
+  position: absolute;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  display: none;
+}
+
+.stage.blank .empty { display: block; }
+.stage.blank #frame { display: none; }
+.stage.blank .timecard { display: none; }
+
+/* The time is the thing you watch during playback, so it sits over the image
+   on a material rather than in the chrome. */
+.timecard {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  padding: 10px 16px 11px;
+  border-radius: var(--radius-m);
+  background: rgba(28, 28, 30, 0.62);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  color: #fff;
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+}
+
+.clock {
+  font-size: 30px;              /* Title 1 */
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Satellite times are UTC and the page never converts them, so the zone is
+   named rather than left for the reader to assume. Subordinate to the digits -
+   it is a unit, not part of the reading. */
+.clock .tz {
+  margin-left: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  vertical-align: 0.32em;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.clock-meta {
+  margin-top: 3px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.clock-meta .sep { margin: 0 5px; opacity: .5; }
+
+/* ---------------------------------------------------------------- sidebar */
+
+.sidebar {
+  width: 250px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-l);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-1);
+}
+
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 13px;              /* Headline */
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: var(--label-2);
+}
+
+.swatch i {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: none;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+}
+
+.rampbar {
+  height: 12px;
+  border-radius: 6px;
+  margin: 2px 0 6px;
+  display: flex;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+}
+
+.rampbar span { flex: 1; }
+
+.ramplabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--label-2);
+}
+
+.note {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--label-3);
+}
+
+.rows { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12.5px; }
+.rows dt { color: var(--label-3); }
+.rows dd { margin: 0; color: var(--label-2); font-variant-numeric: tabular-nums; }
+
+/* --------------------------------------------------------------- playback */
+
+.playbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px 18px;
+  border-top: 0.5px solid var(--separator);
+  background: var(--bg-elevated);
+}
+
+.play {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform .1s ease, opacity .2s ease;
+}
+
+.play:hover { opacity: .9; }
+.play:active { transform: scale(0.94); }
+.play svg { width: 18px; height: 18px; fill: currentColor; }
+
+.scrubwrap { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+
+input[type="range"] {
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--fill-strong);
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+}
+
+.buffer { height: 2px; border-radius: 1px; background: var(--fill); overflow: hidden; }
+.bar { height: 100%; width: 0; background: var(--accent); opacity: .55; transition: width .2s ease; }
+
+.counter {
+  min-width: 92px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--label-2);
+}
+
+@media (max-width: 900px) {
+  main { flex-direction: column; }
+  .sidebar { width: auto; flex-direction: row; }
+  .card { flex: 1; }
+  .clock { font-size: 24px; }
+
+  /* The trailing-edge push only makes sense on one row; wrapped, it just
+     leaves a hole. */
+  .spacer { display: none; }
+
+  /* Anchored to the toolbar rather than to the button.
+     Hanging a fixed-width panel off either edge of its own button only decides
+     which side it falls off: anchored right it left the calendar off the left
+     of the window, and anchored left it pushed both panels off the right. On a
+     narrow screen there is no room to be clever, so the panel stops being
+     positioned by the button at all - `.menu` goes static, which makes the
+     containing block `.controls`, and insetting from both of its edges leaves
+     the panel on screen wherever its button happens to have wrapped to. */
+  .controls { position: relative; }
+  .menu { position: static; }
+
+  .menupanel {
+    top: 100%;
+    left: 24px;
+    right: 24px;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* Day cells shrink so seven columns still fit a narrow screen. */
+  .calgrid { grid-template-columns: repeat(7, 30px); }
+
+  /* Speed goes under the timeline instead of squeezing it. */
+  .playbar { flex-wrap: wrap; row-gap: 8px; }
+}

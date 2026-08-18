@@ -1,0 +1,27 @@
+[package]
+name = "eumet-stream"
+version = "0.1.0"
+edition = "2021"
+description = "Live colour visualisation of EUMETCast satellite imagery over Europe"
+readme = "README.md"
+license = "MIT"
+keywords = ["satellite", "eumetcast", "seviri", "meteosat", "hdf5"]
+categories = ["science", "visualization", "web-programming::http-server"]
+default-run = "eumet-stream"
+# The screenshots and the vendored decompressor are not needed to build.
+exclude = ["docs/*", "vendor/*", "tools/*.exe"]
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs", "sync"] }
+bytes = "1"
+png = "0.17"
+gif = "0.13"
+flate2 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

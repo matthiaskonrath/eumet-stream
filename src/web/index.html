@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Europe - EUMETCast</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22%3E%3Cdefs%3E%3CclipPath id=%22d%22%3E%3Ccircle cx=%2217%22 cy=%2220%22 r=%2213%22/%3E%3C/clipPath%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%234aa3ff%22/%3E%3Cstop offset=%221%22 stop-color=%22%230a4d9c%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2217%22 cy=%2220%22 r=%2213%22 fill=%22url(%23g)%22/%3E%3Cg clip-path=%22url(%23d)%22 stroke=%22%23fff%22 stroke-opacity=%22.72%22 stroke-width=%221.6%22 stroke-linecap=%22round%22%3E%3Cline x1=%222%22 y1=%2213%22 x2=%2227%22 y2=%2213%22/%3E%3Cline x1=%222%22 y1=%2218%22 x2=%2232%22 y2=%2218%22/%3E%3Cline x1=%222%22 y1=%2223%22 x2=%2224%22 y2=%2223%22/%3E%3Cline x1=%222%22 y1=%2228%22 x2=%2229%22 y2=%2228%22/%3E%3C/g%3E%3Ccircle cx=%2217%22 cy=%2220%22 r=%2213%22 fill=%22none%22 stroke=%22%23fff%22 stroke-opacity=%22.5%22 stroke-width=%221.4%22/%3E%3Ccircle cx=%2235%22 cy=%2210%22 r=%222.6%22 fill=%22%23007aff%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="toolbar">
+    <!-- The disc as the satellite sees it, crossed by the scan lines that build
+         the image, with the spacecraft at geostationary height off to one side.
+         Drawn rather than fetched, so the page stays self-contained. -->
+    <svg class="logo" viewBox="0 0 40 40" role="img" aria-label="eumet-stream">
+      <defs>
+        <clipPath id="disc"><circle cx="17" cy="20" r="13"/></clipPath>
+        <linearGradient id="limb" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="var(--logo-hi)"/>
+          <stop offset="1" stop-color="var(--logo-lo)"/>
+        </linearGradient>
+      </defs>
+      <circle cx="17" cy="20" r="13" fill="url(#limb)"/>
+      <g clip-path="url(#disc)" stroke="var(--logo-scan)" stroke-width="1.6" stroke-linecap="round">
+        <line x1="2" y1="13" x2="27" y2="13"/>
+        <line x1="2" y1="18" x2="32" y2="18"/>
+        <line x1="2" y1="23" x2="24" y2="23"/>
+        <line x1="2" y1="28" x2="29" y2="28"/>
+      </g>
+      <circle cx="17" cy="20" r="13" fill="none" stroke="var(--logo-edge)" stroke-width="1.4"/>
+      <circle cx="35" cy="10" r="2.6" fill="var(--accent)"/>
+    </svg>
+    <div class="titles">
+      <h1>Europe</h1>
+      <p class="subtitle">Live from EUMETCast</p>
+    </div>
+    <div class="status" id="status" title="Age of the most recent image">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Checking...</span>
+    </div>
+  </header>
+
+  <section class="controls" id="controls">
+    <div class="field">
+      <span class="field-label">Mode</span>
+      <div class="segmented" id="modes">
+        <button data-mode="live">Live</button>
+        <button data-mode="playback" class="on">Playback</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label" for="views">Layer</label>
+      <select class="popup" id="views"></select>
+    </div>
+    <div class="field">
+      <span class="field-label">Area</span>
+      <div class="segmented" id="regions">
+        <button data-bbox="europe" class="on">Europe</button>
+        <button data-bbox="wide">Wide</button>
+        <button data-bbox="globe">Globe</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">Window</span>
+      <div class="segmented" id="windows"></div>
+    </div>
+    <div class="field">
+      <label class="field-label" for="steps">Every</label>
+      <select class="popup" id="steps"></select>
+    </div>
+
+    <!-- Only present while Window is set to Range. The calendar lives inside
+         it rather than in a band of its own, which was 310px of the image. -->
+    <details class="menu datemenu" id="dateMenu" hidden>
+      <summary class="menubutton" id="dateButton" aria-label="Choose dates">
+        <svg viewBox="0 0 16 16" aria-hidden="true" width="14" height="14">
+          <path d="M5 1v1.5H4A2 2 0 002 4.5v8A2 2 0 004 14.5h8a2 2 0 002-2v-8a2 2 0 00-2-2h-1V1H9.5v1.5h-3V1H5zm7 5v6.5H4V6h8z"/>
+        </svg>
+        <span id="dateLabel">Pick dates</span>
+      </summary>
+      <div class="menupanel calpanel">
+        <div class="cal" id="cal">
+          <div class="calhead">
+            <button class="calnav" id="calPrev" aria-label="Previous month">&#8249;</button>
+            <span class="calmonth" id="calMonth"></span>
+            <button class="calnav" id="calNext" aria-label="Next month">&#8250;</button>
+            <span class="tzhint">UTC</span>
+          </div>
+          <div class="calgrid" id="calGrid" role="grid" aria-label="Days with imagery"></div>
+          <div class="calfoot">
+            <span class="rangenote" id="rangeNote" role="status"></span>
+            <button class="calclear" id="calClear" hidden>Clear</button>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <div class="spacer"></div>
+
+    <details class="menu" id="settingsMenu">
+      <summary class="menubutton" title="Display settings" aria-label="Display settings">
+        <svg viewBox="0 0 16 16" aria-hidden="true" width="15" height="15">
+          <path d="M8 5.2a2.8 2.8 0 100 5.6 2.8 2.8 0 000-5.6zm6.3 3.6l1.3 1a.4.4 0 01.1.5l-1.3 2.2a.4.4 0 01-.5.2l-1.6-.6a5.7 5.7 0 01-1.2.7l-.2 1.7a.4.4 0 01-.4.3H7.5a.4.4 0 01-.4-.3l-.2-1.7a5.7 5.7 0 01-1.2-.7l-1.6.6a.4.4 0 01-.5-.2L2.3 10.3a.4.4 0 01.1-.5l1.3-1a5.6 5.6 0 010-1.5l-1.3-1a.4.4 0 01-.1-.5l1.3-2.2a.4.4 0 01.5-.2l1.6.6c.4-.3.8-.5 1.2-.7l.2-1.7a.4.4 0 01.4-.3h2.6c.2 0 .4.1.4.3l.2 1.7c.4.2.8.4 1.2.7l1.6-.6a.4.4 0 01.5.2l1.3 2.2a.4.4 0 01-.1.5l-1.3 1a5.6 5.6 0 010 1.5z"/>
+        </svg>
+        <span>Display</span>
+      </summary>
+      <div class="menupanel">
+        <div class="menurow">
+          <span class="menulabel">Resolution</span>
+          <div class="segmented" id="scales"></div>
+        </div>
+        <div class="menurow">
+          <span class="menulabel">Overlays</span>
+          <div class="segmented multi">
+            <button id="outlines" class="on" title="Coastlines and country borders">Outlines</button>
+            <button id="locate">My location</button>
+          </div>
+        </div>
+        <div class="menurow">
+          <span class="menulabel">Theme</span>
+          <div class="segmented" id="themes"></div>
+        </div>
+      </div>
+    </details>
+
+    <div class="field">
+      <span class="field-label">Save</span>
+      <div class="segmented">
+        <button id="saveFrame">Frame</button>
+        <button id="saveAnim">Animation</button>
+      </div>
+    </div>
+  </section>
+
+  <main>
+    <div class="stage" id="stage">
+      <canvas id="frame" role="img" aria-label="Satellite view of Europe"></canvas>
+      <div class="marker" id="marker" hidden><span></span></div>
+      <div class="timecard" id="timecard">
+        <div class="clock"><span id="clockTime">--:--</span><span class="tz">UTC</span></div>
+        <div class="clock-meta">
+          <span id="clockDate">-</span>
+          <span class="sep">-</span>
+          <span id="clockAgo">-</span>
+        </div>
+      </div>
+      <div class="loopbadge" id="loopBadge">Back to start</div>
+      <p class="empty" id="empty">No imagery for this window.</p>
+    </div>
+
+    <aside class="sidebar">
+      <div class="card" id="legendCard"></div>
+      <div class="card" id="infoCard"></div>
+    </aside>
+  </main>
+
+  <footer class="playbar" id="playbar">
+    <button class="play" id="play" aria-label="Play or pause">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M8 5v14l11-7z"/></svg>
+    </button>
+    <span class="playlabel" id="playLabel">Play</span>
+    <div class="scrubwrap">
+      <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="Timeline">
+      <div class="buffer"><div class="bar" id="buffer"></div></div>
+    </div>
+    <div class="counter" id="counter">0 / 0</div>
+    <div class="segmented compact" id="speeds" title="Playback speed"></div>
+  </footer>
+
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
