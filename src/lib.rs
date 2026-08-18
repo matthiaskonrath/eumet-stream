@@ -12,5 +12,6 @@ pub mod product;
 pub mod purge;
 pub mod render;
 pub mod solar;
+pub mod sysmem;
 
 pub mod rgb;

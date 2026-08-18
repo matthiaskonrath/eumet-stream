@@ -242,24 +242,73 @@ pub fn unpack10(data: &[u8], count: usize) -> Vec<u16> {
 // Decompression
 // ---------------------------------------------------------------------------
 
-/// Find EUMETSAT's `xRITDecompress`, which handles the wavelet-compressed
-/// pixel data. Checked in order: the `XRIT_DECOMPRESS` environment variable,
-/// a `tools/` directory beside the executable or the working directory, then
-/// whatever is on `PATH`.
-pub fn find_decompressor() -> Option<PathBuf> {
-    let exe_name = if cfg!(windows) {
+/// What the decompressor is called on this platform.
+pub fn decompressor_name() -> &'static str {
+    if cfg!(windows) {
         "xRITDecompress.exe"
     } else {
         "xRITDecompress"
-    };
+    }
+}
 
-    if let Ok(p) = std::env::var("XRIT_DECOMPRESS") {
-        let p = PathBuf::from(p);
-        if p.is_file() {
-            return Some(p);
+/// Resolve a path the user named explicitly, on the command line or in the
+/// environment.
+///
+/// A directory is accepted as well as a file, and searched the same way as any
+/// other candidate directory: naming the folder the executable sits in is the
+/// obvious mistake to make, and it costs nothing to be right about it. Returns
+/// `None` if nothing is there, so the caller can say so rather than fall back
+/// to a search and report a path the user did not ask for.
+pub fn decompressor_at(path: &Path) -> Option<PathBuf> {
+    if path.is_file() {
+        return Some(path.to_path_buf());
+    }
+    if path.is_dir() {
+        return in_dir(path);
+    }
+    None
+}
+
+/// The executable in this directory, or in a `tools/` beneath it.
+fn in_dir(dir: &Path) -> Option<PathBuf> {
+    let name = decompressor_name();
+    let here = dir.join(name);
+    if here.is_file() {
+        return Some(here);
+    }
+    let tools = dir.join("tools").join(name);
+    if tools.is_file() {
+        return Some(tools);
+    }
+    None
+}
+
+/// Find EUMETSAT's `xRITDecompress`, which handles the wavelet-compressed
+/// pixel data.
+///
+/// Checked in order: the `XRIT_DECOMPRESS` environment variable, the working
+/// directory, the directory holding the executable, the project root above
+/// `target/release/`, and then `PATH`. Each of those directories is checked
+/// both directly and for a `tools/` beneath it, so the build script's output
+/// location and a binary dropped next to the exe both work.
+///
+/// The working directory comes first among the implicit ones because it is the
+/// one the operator chose by running there. `--decompressor` overrides all of
+/// this and is handled by the caller.
+pub fn find_decompressor() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("XRIT_DECOMPRESS") {
+        /* A stale variable falls through to the search rather than failing.
+        The flag does the opposite: an environment is inherited and often
+        forgotten, but a flag is typed for this run, so a wrong one is a typo
+        to report rather than a preference to work around. */
+        if let Some(found) = decompressor_at(Path::new(&p)) {
+            return Some(found);
         }
     }
     let mut roots: Vec<PathBuf> = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        roots.push(cwd);
+    }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             roots.push(dir.to_path_buf());
@@ -269,16 +318,12 @@ pub fn find_decompressor() -> Option<PathBuf> {
             }
         }
     }
-    if let Ok(cwd) = std::env::current_dir() {
-        roots.push(cwd);
-    }
     for r in roots {
-        let c = r.join("tools").join(exe_name);
-        if c.is_file() {
-            return Some(c);
+        if let Some(found) = in_dir(&r) {
+            return Some(found);
         }
     }
-    which(exe_name)
+    which(decompressor_name())
 }
 
 fn which(name: &str) -> Option<PathBuf> {
@@ -879,5 +924,75 @@ mod audit_tests {
             d[18] = 3; // len = 3, far shorter than the fields read below
             let _ = Headers::parse(&d);
         }
+    }
+}
+
+#[cfg(test)]
+mod decompressor_tests {
+    use super::*;
+
+    fn tmpdir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!(
+            "eumet-xrit-test-{tag}-{}",
+            crate::diskcache::unique()
+        ));
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    fn place(dir: &Path) -> PathBuf {
+        std::fs::create_dir_all(dir).unwrap();
+        let p = dir.join(decompressor_name());
+        std::fs::write(&p, b"not really an executable").unwrap();
+        p
+    }
+
+    #[test]
+    fn the_executable_itself_is_taken_as_given() {
+        let d = tmpdir("file");
+        let exe = place(&d);
+        assert_eq!(decompressor_at(&exe), Some(exe));
+    }
+
+    #[test]
+    fn a_directory_is_searched_rather_than_rejected() {
+        // Naming the folder instead of the file is the obvious slip, and the
+        // answer is unambiguous, so it is accepted.
+        let d = tmpdir("dir");
+        let exe = place(&d);
+        assert_eq!(decompressor_at(&d), Some(exe));
+    }
+
+    #[test]
+    fn a_tools_subdirectory_is_searched_too() {
+        // Where build-decompressor.ps1 puts it.
+        let d = tmpdir("tools");
+        let exe = place(&d.join("tools"));
+        assert_eq!(decompressor_at(&d), Some(exe));
+    }
+
+    #[test]
+    fn the_directory_itself_wins_over_its_tools() {
+        let d = tmpdir("both");
+        let here = place(&d);
+        place(&d.join("tools"));
+        assert_eq!(decompressor_at(&d), Some(here));
+    }
+
+    #[test]
+    fn nothing_there_is_none_rather_than_a_guess() {
+        let d = tmpdir("empty");
+        assert_eq!(decompressor_at(&d), None);
+        assert_eq!(decompressor_at(&d.join("nonexistent")), None);
+        // An empty tools/ is still nothing.
+        std::fs::create_dir_all(d.join("tools")).unwrap();
+        assert_eq!(decompressor_at(&d), None);
+    }
+
+    #[test]
+    fn the_name_matches_the_platform() {
+        let name = decompressor_name();
+        assert!(name.starts_with("xRITDecompress"));
+        assert_eq!(name.ends_with(".exe"), cfg!(windows));
     }
 }

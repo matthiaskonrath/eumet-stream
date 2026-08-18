@@ -1,5 +1,6 @@
 # eumet-stream
 
+[![CI](https://github.com/OWNER/eumet-stream/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/eumet-stream/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A Rust web application that renders live EUMETCast satellite imagery of Europe
@@ -22,8 +23,9 @@ starts, reports `frames indexed: 0`, and withdraws every layer.
   (the usual `E1B-GEO-*` channel directories).
 - **Rust** (stable) to build it.
 - **Windows** for the SEVIRI layers specifically, because EUMETSAT's wavelet
-  decompressor is built with MSVC by the helper script. The NWC SAF layers, and
-  the whole crate, have nothing platform-specific in them.
+  decompressor is built with MSVC by the helper script. The NWC SAF layers work
+  anywhere, and the only platform-specific code in the crate is the one call
+  that asks how much memory the machine has — see [Caching](#caching).
 
 ### Getting EUMETCast data
 
@@ -73,6 +75,10 @@ through the same account.
 | ![Airmass](docs/airmass.jpg) **Airmass** — jet streams and stratospheric intrusions | ![Dust](docs/dust.jpg) **Dust** — Saharan dust and volcanic ash |
 | ![Night microphysics](docs/nightfog.jpg) **Night microphysics** — fog and low stratus in the dark | ![Earth natural](docs/earth-natural.jpg) **Earth (natural)** — derived basemap with a real day/night terminator |
 | ![Cloud type](docs/cloudtype.jpg) **Cloud type** — the official 15-class NWC SAF palette | ![Cloud top temperature](docs/cloudtop-temp.jpg) **Cloud top temperature** — continuous ramp, 200–300 K |
+
+The ninth, **Cloud top height**, is not pictured: it is the same `CTTH` data as
+cloud top temperature on a 0–13 km ramp, so the two look alike at a glance and
+differ in what the ramp means. All nine are in [Layers](#layers).
 
 The five raw-imagery layers also draw the **whole disc**:
 
@@ -656,18 +662,30 @@ taste:
 | control groups | 11 | **7** |
 | rows | 4 | **2** (one at 1920) |
 | chrome | 309 px | **233 px** |
-| the image | 379 px, 53% | **455 px, 63%** (77% at 1920) |
+| the image | 379 px, 53% | **455 px, 63%** (79% at 1920) |
 
-The dates row is its own band below the toolbar rather than a field inside it,
-so appearing and disappearing does not reflow everything beside it. And nothing
-in it asks to be confirmed: **the dates apply themselves**, the way picking a
-window or a layer does. A *Replay* button had been the one control that also
-wanted pressing afterwards, which made it look broken — you set the dates, the
-timeline changed, and the button appeared to do nothing.
+**The calendar is a popover, not a band.** It began as a row below the toolbar,
+which cost 310 px of the picture whenever *Range* was selected and kept costing
+it after the dates were chosen — a control that is used for two clicks and then
+finished has no business holding a permanent share of a viewer. It is now behind
+the *Pick dates* button, which carries the chosen span as its label, and which
+only appears in *Range* at all. Like *Display* it dismisses on an outside click
+and on Escape.
+
+Nothing in it asks to be confirmed: **the dates apply themselves**, the way
+picking a window or a layer does. A *Replay* button had been the one control
+that also wanted pressing afterwards, which made it look broken — you set the
+dates, the timeline changed, and the button appeared to do nothing.
 
 The calendar removed that whole class of problem: a click is unambiguous, so
 there is no committed-versus-typed distinction to get wrong and nothing to
 debounce.
+
+**Live disables Range** rather than offering it and doing nothing with it. Live
+holds the newest image and has no timeline, so a span of the past has nothing to
+be a span of; choosing it there would have loaded a range and then shown one
+frame of it. Switching to Live from a range restores the rolling window the
+range replaced, so switching back is not a dead end.
 
 **The logo** is the disc as the satellite sees it, crossed by the scan lines
 that build the image, with the spacecraft off to one side at geostationary
@@ -717,16 +735,42 @@ powershell -File tools\build-decompressor.ps1
 ```
 
 That clones <https://gitlab.eumetsat.int/open-source/PublicDecompWT>, builds it
-with your Visual Studio C++ toolchain, and installs `tools\xRITDecompress.exe`,
-where the server finds it automatically. `XRIT_DECOMPRESS` overrides the path.
+with your Visual Studio C++ toolchain, and installs `tools\xRITDecompress.exe`.
 
-Without it the other four layers work normally and the live layer simply does
-not appear in the picker.
+**Finding it.** If you already have a copy — a EUMETSAT install, a build from
+elsewhere — you do not have to run the script. Drop the executable in the
+directory you start the server from and it is picked up. The search, in order:
+
+1. `--decompressor <path>`
+2. the `XRIT_DECOMPRESS` environment variable
+3. the **working directory**
+4. the directory holding `eumet-stream` itself
+5. the project root above `target\release\`
+6. `PATH`
+
+Each of 3–5 is checked directly and for a `tools\` beneath it, so the build
+script's output and a binary dropped beside the exe both work.
+
+`--decompressor` takes either the executable or the directory holding it:
+
+```bash
+eumet-stream --decompressor "D:\EUMETSAT\bin\xRITDecompress.exe"
+```
+
+Unlike the rest of the search, a path given on the flag is not searched past: if
+nothing is there the server says so and exits, rather than reporting a
+decompressor at some other path and leaving the typo to be discovered later. A
+stale `XRIT_DECOMPRESS` does fall through to the search, because an environment
+is inherited and forgotten in a way a flag typed for this run is not.
+
+Without a decompressor at all, the four NWC SAF layers work normally and the
+five raw-imagery layers simply do not appear in the picker.
 
 Decompressed segments are cached under the system temp directory. A slot expands
 to about 26 MB across the four channels, so the cache is pruned oldest-first at
 3 GB. Because raw frames are expensive to build, a window is thinned to at most
-110 frames — six hours still arrives at the full 5-minute cadence.
+`MAX_FRAMES` — 400 — so six hours still arrives at the full 5-minute cadence,
+and only a long span at a fine interval loses anything.
 
 ### Three things that are easy to get wrong
 
@@ -857,6 +901,11 @@ src/
   catalog.rs   scans the receive directory, indexes slots by time
   product.rs   loads NWC SAF fields, palettes, geography and illumination
   render.rs    compositing, coastlines, colour ramps, PNG encoding
+  rgb.rs       the infrared composite recipes
+  anim.rs      batched GIF and APNG encoding for exports
+  diskcache.rs bounded on-disk caches: measuring, pruning, atomic writes
+  purge.rs     retention deletion of received data
+  sysmem.rs    physical memory, to size the in-memory cache
   main.rs      axum server and JSON API
   borders.rs   embedded country boundaries
   web/         the front end
@@ -896,12 +945,25 @@ cargo run --bin livedump -- <hrit dir> out.png   # one raw frame, with diagnosti
 |---|---|
 | `GET /api/init` | available layers, their intervals, and window lengths |
 | `GET /api/status` | newest slot per source, for the freshness pill and auto-update |
-| `GET /api/frames?view=&hours=&step=` | slots in the window at the chosen interval |
+| `GET /api/frames?view=&hours=&step=&bbox=` | slots in the window at the chosen interval |
+| &nbsp;&nbsp;`&from=&to=` | a range in place of the rolling window, as Unix seconds |
+| `GET /api/range?view=&bbox=` | which days hold data, and how many slots each has |
 | `GET /api/native?view=&bbox=` | native sample count and the window's bounds |
 | `GET /api/legend?view=` | class colours, or the ramp and its range |
 | `GET /api/frame.png?view=&t=&bbox=&w=&h=&coast=&borders=` | a rendered frame |
 | &nbsp;&nbsp;`&win=` or `&disc=` | an explicit window, if you want one from the API |
-| `GET /api/animation.png?view=&hours=&step=&bbox=&w=&h=&fps=` | the window as an animated PNG |
+| `GET /api/animation.png?view=&hours=&step=&bbox=&w=&h=&fps=` | the window as an animated GIF |
+| &nbsp;&nbsp;`&from=&to=` | a range here too, the same as for frames |
+| &nbsp;&nbsp;`&format=apng` | APNG instead, full colour but browser-only |
+
+`bbox` is the area name — `europe`, `wide` or `globe` — rather than a bounding
+box, which the name does not suggest; `win=`/`disc=` are how you pass actual
+bounds.
+
+`from`/`to` are what the calendar sends. They are bounded by
+`MAX_RANGE_DAYS` — 31 — and a span too long for `MAX_FRAMES` at the interval
+asked for is coarsened rather than truncated, so both ends survive.
+`/api/range` is what tells the calendar which days to mark.
 
 ## Nothing renders until you ask
 
@@ -1075,15 +1137,34 @@ Three layers, because the expensive work is worth never repeating:
   overlays. Finished PNGs therefore outlive the process: restarting the server,
   or coming back to a window you looked at yesterday, serves from disk rather
   than decompressing and reprojecting again. This matters most for raw imagery,
-  where a globe frame costs several seconds to build. Held to **16 GB on disk**
-  and **4 GB in memory** — sized for the demanding case, which is a long range:
-  400 full-disc frames at 2400 square are 10.4 MB each, so one such window is
+  where a globe frame costs several seconds to build.
+
+  The disk half is held to **16 GB**, sized for the demanding case: 400
+  full-disc frames at 2400 square are 10.4 MB each, so a single long range is
   4 GB on its own. At the previous 2 GB the cache evicted frames from the start
   of a pass before playback reached them and re-rendered what it had just built.
-  Only the 4 GB is RAM; the 16 GB is disk, and it is a fraction of a percent of
-  the drive it lives on. Both are ceilings rather than reservations — a European
-  window at 1000 x 400 is 350 kB a frame, and 340 of them measured 421 MB
-  resident.
+
+  The memory half is sized **from the machine**, at startup: a quarter of
+  physical RAM, no more than **8 GB** and no less than 512 MB. A fixed figure
+  was wrong in both directions — it wasted a large machine or swapped a small
+  one. Eight is where the ceiling stops earning its keep, because it already
+  holds two full-disc windows and so covers switching between a pair of layers
+  without touching disk; 512 MB is where one European window stops fitting, at
+  350 kB a frame. On a machine that will not say how much memory it has —
+  anything that is neither Windows nor Linux — it is 1 GB, low on purpose,
+  because guessing high is the only way this can do real harm. The figure is
+  printed at startup.
+
+  Asking costs the crate its only `unsafe` block and its only `cfg`, both in
+  [`src/sysmem.rs`](src/sysmem.rs): `std` has no memory API, and a dependency
+  tree for one number was the worse trade. Windows calls `GlobalMemoryStatusEx`
+  through a declaration of the kernel32 entry point; Linux reads
+  `/proc/meminfo` in safe code; everything else returns `None`. A wrong answer
+  costs throughput and never correctness, which is why it is allowed to be a
+  guess at all.
+
+  Both are ceilings rather than reservations: nothing is allocated up front, and
+  340 frames of a European window measured 421 MB resident.
 
   Pruning walks the whole directory to measure it, which is 95 ms at 1700 files
   and closer to half a second at the 16 GB ceiling. It runs on its own timer for

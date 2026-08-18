@@ -72,11 +72,43 @@ const RENDER_PRUNE_EVERY: Duration = Duration::from_secs(120);
 /// fixed number of entries means anything between a few tens of megabytes and
 /// most of a gigabyte.
 ///
-/// Four gigabytes holds a whole 400-frame full-disc window, so replaying one a
-/// second time touches no disk at all. This is the only cache that occupies
-/// RAM - the sixteen gigabytes above is disk - and it is a small fraction of
-/// any machine that would be asked to render a month of imagery.
-const MEMORY_CACHE_BYTES: usize = 4 * 1024 * 1024 * 1024;
+/// A quarter of physical memory, up to eight gigabytes.
+///
+/// A fixed figure was wrong in both directions: it either wasted a large
+/// machine or swapped a small one, and this is the only cache that occupies
+/// RAM - the sixteen gigabytes above is disk. So it is sized from what the
+/// machine actually has, once, at startup.
+///
+/// Eight is where the ceiling stops mattering. A 400-frame full-disc window at
+/// 2400 square is 4 GB, so eight holds two of them and the switch between a
+/// pair of layers costs no disk at all; past that the returns are small and the
+/// figure is just a larger number to be surprised by.
+///
+/// A quarter, because the process wants memory for more than this: decoding,
+/// the export batch, and whatever else the machine is for.
+const MEMORY_CACHE_SHARE: u64 = 4;
+const MEMORY_CACHE_MAX: u64 = 8 * 1024 * 1024 * 1024;
+
+/// Below this a single European window - 340 frames at 350 kB is 421 MB - no
+/// longer fits, and every replay re-renders from the start. A machine too small
+/// for that is better off re-rendering than swapping, but not by much, so this
+/// is the floor rather than the share.
+const MEMORY_CACHE_MIN: u64 = 512 * 1024 * 1024;
+
+/// What to use when the platform will not say how much memory it has. Small on
+/// purpose: guessing high is the only way this decision can do real harm.
+const MEMORY_CACHE_UNKNOWN: u64 = 1024 * 1024 * 1024;
+
+/// Size the in-memory frame cache from total physical memory.
+fn memory_cache_bytes(total_ram: Option<u64>) -> usize {
+    let bytes = match total_ram {
+        Some(total) => (total / MEMORY_CACHE_SHARE).clamp(MEMORY_CACHE_MIN, MEMORY_CACHE_MAX),
+        None => MEMORY_CACHE_UNKNOWN,
+    };
+    // `usize` is narrower than `u64` only on a 32-bit target, where the address
+    // space binds long before the ceiling does.
+    bytes.min(usize::MAX as u64) as usize
+}
 
 /// Rendered frames kept in memory, bounded by total size.
 struct Cache {
@@ -317,6 +349,7 @@ async fn main() {
     let mut bind = LOOPBACK.to_string();
     let mut retain_days: Option<i64> = None;
     let mut purge_dry_run = false;
+    let mut decompressor_arg: Option<PathBuf> = None;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -362,6 +395,14 @@ async fn main() {
                 }
             }
             "--purge-dry-run" => purge_dry_run = true,
+            /* Named explicitly when the search will not find it - an install
+            elsewhere, a shared copy, or several builds to choose between.
+            Takes the executable or the directory holding it. */
+            "--decompressor" => {
+                if let Some(v) = args.next() {
+                    decompressor_arg = Some(PathBuf::from(v));
+                }
+            }
             "--help" | "-h" => {
                 println!("usage: eumet-stream [options]");
                 println!();
@@ -380,6 +421,12 @@ async fn main() {
                 );
                 println!("  --purge-dry-run    report what --retain-days would delete, and");
                 println!("                     delete nothing.");
+                println!("  --decompressor <path>");
+                println!("                     EUMETSAT's xRITDecompress, needed by the SEVIRI");
+                println!("                     layers. The executable, or a directory holding");
+                println!("                     it. Found automatically in the working");
+                println!("                     directory, beside this executable, or on PATH;");
+                println!("                     give this when it lives somewhere else.");
                 println!("  --bind <addr>      default {LOOPBACK}, this machine only.");
                 println!("                     'all' listens on every interface, so other");
                 println!("                     machines on your network can open it. There is");
@@ -414,12 +461,30 @@ async fn main() {
     );
     println!("  border polylines  : {}", borders::polyline_count());
 
-    let decompressor = hrit::find_decompressor();
+    /* A path given on the command line is not searched past. Falling back
+    would report a decompressor at some other path, which reads as success and
+    hides the typo that caused it. */
+    let decompressor = match &decompressor_arg {
+        Some(asked) => match hrit::decompressor_at(asked) {
+            Some(found) => Some(found),
+            None => {
+                eprintln!(
+                    "--decompressor {}: no {} there\n\
+                     Give the executable itself, or the directory holding it.",
+                    asked.display(),
+                    hrit::decompressor_name()
+                );
+                std::process::exit(2);
+            }
+        },
+        None => hrit::find_decompressor(),
+    };
     match &decompressor {
         Some(p) => println!("  decompressor      : {}", p.display()),
         None => println!(
             "  decompressor      : NOT FOUND - the SEVIRI layers need xRITDecompress\n\
-                                   (run tools\\build-decompressor.ps1, or set XRIT_DECOMPRESS)"
+             \x20                   (run tools\\build-decompressor.ps1, pass --decompressor,\n\
+             \x20                    or set XRIT_DECOMPRESS)"
         ),
     }
 
@@ -440,6 +505,14 @@ async fn main() {
         print!(", {} MB pruned", freed / (1024 * 1024));
     }
     println!(")");
+
+    let total_ram = eumet_stream::sysmem::total_bytes();
+    let memory_cache = memory_cache_bytes(total_ram);
+    print!("  memory cache      : {} MB", memory_cache / (1024 * 1024));
+    match total_ram {
+        Some(total) => println!(" (of {} MB physical)", total / (1024 * 1024)),
+        None => println!(" (physical memory unknown on this platform)"),
+    }
 
     let hrit_cache = std::env::temp_dir().join("eumet-stream-hrit");
     std::fs::create_dir_all(&hrit_cache).ok();
@@ -462,7 +535,7 @@ async fn main() {
         hrit_cache,
         render_cache,
         decompressor,
-        cache: Mutex::new(Cache::new(MEMORY_CACHE_BYTES)),
+        cache: Mutex::new(Cache::new(memory_cache)),
         index: Mutex::new(Indexes {
             slots: HashMap::new(),
             catalog: None,
@@ -2125,5 +2198,52 @@ mod range_tests {
         assert!(range_from(&q(&[])).unwrap().is_none());
         assert!(range_from(&q(&[("from", "x"), ("to", "1")])).is_err());
         assert!(range_from(&q(&[("from", "9"), ("to", "9")])).is_err());
+    }
+}
+
+#[cfg(test)]
+mod memory_cache_tests {
+    use super::*;
+
+    const GB: u64 = 1024 * 1024 * 1024;
+
+    #[test]
+    fn a_large_machine_is_held_to_the_ceiling() {
+        // The machine this is developed on: a quarter is 16 GB, the cap is 8.
+        assert_eq!(memory_cache_bytes(Some(64 * GB)), 8 * GB as usize);
+        assert_eq!(memory_cache_bytes(Some(512 * GB)), 8 * GB as usize);
+    }
+
+    #[test]
+    fn a_middling_machine_gets_its_share() {
+        assert_eq!(memory_cache_bytes(Some(32 * GB)), 8 * GB as usize);
+        assert_eq!(memory_cache_bytes(Some(16 * GB)), 4 * GB as usize);
+        assert_eq!(memory_cache_bytes(Some(8 * GB)), 2 * GB as usize);
+    }
+
+    #[test]
+    fn a_small_machine_is_held_to_the_floor() {
+        // A quarter of 2 GB is 512 MB, which is exactly the floor; below that
+        // the floor is what keeps a European window resident.
+        assert_eq!(memory_cache_bytes(Some(2 * GB)), MEMORY_CACHE_MIN as usize);
+        assert_eq!(memory_cache_bytes(Some(GB)), MEMORY_CACHE_MIN as usize);
+        assert_eq!(memory_cache_bytes(Some(1)), MEMORY_CACHE_MIN as usize);
+    }
+
+    #[test]
+    fn an_unknown_machine_gets_the_conservative_default() {
+        let unknown = memory_cache_bytes(None);
+        assert_eq!(unknown, MEMORY_CACHE_UNKNOWN as usize);
+        // The point of the fallback is that it is safe on a small machine, so
+        // it must sit at the bottom of the range rather than in the middle.
+        assert!(unknown < MEMORY_CACHE_MAX as usize / 4);
+        assert!(unknown >= MEMORY_CACHE_MIN as usize);
+    }
+
+    #[test]
+    fn zero_is_treated_as_a_small_machine_not_as_none() {
+        // Nothing should report this, but the floor is what stops a bad reading
+        // from producing a cache that holds nothing at all.
+        assert_eq!(memory_cache_bytes(Some(0)), MEMORY_CACHE_MIN as usize);
     }
 }
