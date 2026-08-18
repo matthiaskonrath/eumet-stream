@@ -1,6 +1,5 @@
 # eumet-stream
 
-[![CI](https://github.com/OWNER/eumet-stream/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/eumet-stream/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A Rust web application that renders live EUMETCast satellite imagery of Europe
