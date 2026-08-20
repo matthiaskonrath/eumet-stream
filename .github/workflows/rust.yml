@@ -68,7 +68,7 @@ jobs:
         continue-on-error: true
         run: |
           sudo apt-get update && sudo apt-get install -y build-essential
-          tools/build-decompressor.sh
+          bash tools/build-decompressor.sh
 
       - name: Build eumet-stream
         run: cargo build --release --locked --bin eumet-stream --target ${{ matrix.target }}
