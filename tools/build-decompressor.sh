@@ -38,6 +38,15 @@ if [[ ! -d "$vendor" ]]; then
     GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://gitlab.eumetsat.int/open-source/PublicDecompWT.git "$vendor"
 fi
 
+# DISE/UTCTime.cpp uses mktime/localtime/strftime/struct tm without including
+# <ctime>, relying on it arriving transitively via <sys/time.h> - true on old
+# libstdc++, no longer true since GCC 11ish. Patch it in; it's the only file
+# in the tree that touches time functions.
+utctime="$vendor/DISE/UTCTime.cpp"
+if ! grep -q '#include <ctime>' "$utctime"; then
+    sed -i '/#include "UTCTime.h"/a #include <ctime>' "$utctime"
+fi
+
 # The Makefile's first (and so default) target is "uninstall", not "all" -
 # without this, plain `make` silently removes any installed copy and exits
 # 0 without building anything.
