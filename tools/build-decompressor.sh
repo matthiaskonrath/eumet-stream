@@ -34,10 +34,14 @@ fi
 if [[ ! -d "$vendor" ]]; then
     echo "Cloning PublicDecompWT..."
     mkdir -p "$root/vendor"
-    git clone --depth 1 https://gitlab.eumetsat.int/open-source/PublicDecompWT.git "$vendor"
+    # LFS-tracked test data isn't needed to build; skip pulling it.
+    GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://gitlab.eumetsat.int/open-source/PublicDecompWT.git "$vendor"
 fi
 
-make -C "$vendor/xRITDecompress"
+# The Makefile's first (and so default) target is "uninstall", not "all" -
+# without this, plain `make` silently removes any installed copy and exits
+# 0 without building anything.
+make -C "$vendor/xRITDecompress" all
 
 built="$vendor/xRITDecompress/xRITDecompress"
 if [[ ! -x "$built" ]]; then
