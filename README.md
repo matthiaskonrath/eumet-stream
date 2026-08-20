@@ -21,10 +21,11 @@ starts, reports `frames indexed: 0`, and withdraws every layer.
 - A **EUMETCast** receiver writing NWC SAF products and/or SEVIRI HRIT to disk
   (the usual `E1B-GEO-*` channel directories).
 - **Rust** (stable) to build it.
-- **Windows** for the SEVIRI layers specifically, because EUMETSAT's wavelet
-  decompressor is built with MSVC by the helper script. The NWC SAF layers work
-  anywhere, and the only platform-specific code in the crate is the one call
-  that asks how much memory the machine has — see [Caching](#caching).
+- **Windows or Linux** for the SEVIRI layers specifically, to build EUMETSAT's
+  wavelet decompressor (`tools/build-decompressor.ps1` or `.sh` — upstream does
+  not support macOS). The NWC SAF layers work everywhere, including macOS, and
+  the only platform-specific code in the crate itself is the one call that asks
+  how much memory the machine has — see [Caching](#caching).
 
 ### Getting EUMETCast data
 
@@ -759,7 +760,9 @@ irradiances.
 
 HRIT pixel data is compressed with EUMETSAT's wavelet scheme (`compFlag = 1`,
 lossless, roughly 2.3–3.9:1). There is no Rust implementation. EUMETSAT
-open-sourced theirs under Apache 2.0, so it is built once and used as a helper:
+open-sourced theirs under Apache 2.0, so it is built once and used as a helper.
+
+On Windows:
 
 ```powershell
 powershell -File tools\build-decompressor.ps1
@@ -767,6 +770,21 @@ powershell -File tools\build-decompressor.ps1
 
 That clones <https://gitlab.eumetsat.int/open-source/PublicDecompWT>, builds it
 with your Visual Studio C++ toolchain, and installs `tools\xRITDecompress.exe`.
+
+On Linux:
+
+```bash
+tools/build-decompressor.sh
+```
+
+Same idea, built with `make`/`g++` instead, installing `tools/xRITDecompress`.
+It needs `build-essential` (or your distribution's equivalent) and fails fast
+if `make` or `g++` are missing.
+
+Upstream's build only supports Windows, Linux and Solaris — there is no macOS
+build here, and the project does not attempt one. On macOS the four NWC SAF
+layers still work; the five raw-imagery ones simply do not appear, same as
+running without a decompressor at all.
 
 **Finding it.** If you already have a copy — a EUMETSAT install, a build from
 elsewhere — you do not have to run the script. Drop the executable in the
