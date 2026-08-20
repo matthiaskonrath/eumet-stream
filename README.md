@@ -201,6 +201,38 @@ no frames while Europe and Wide keep working.
 
 `eumet-stream --help` prints the same list with the compiled-in defaults.
 
+### Configuring the receiver: `cast-client-channels_bas.ini`
+
+The TelliCast/TelliVision client (the software that actually writes the
+`E1B-GEO-*` directories) subscribes to dozens of channels by default — DCP,
+EPS, SAF, TPC and the rest — most of which this viewer never reads. Pointing
+`--dir`/`--hrit-dir`/`--disc-dir` at three directories does nothing to stop the
+client from also downloading and storing everything else it is entitled to.
+
+[`cast-client-channels_bas.ini`](cast-client-channels_bas.ini) is a client
+channel configuration that enables **only** the channels this viewer uses,
+leaving every other channel commented out:
+
+| channel | target directory | needed for |
+|---|---|---|
+| `E1B-GEO-3` | `\EUMETCast\received\bas\E1B-GEO-3` | `--disc-dir` — full disc |
+| `E1B-GEO-4` | `\EUMETCast\received\bas\E1B-GEO-4` | `--dir` — NWC SAF products |
+| `E1B-GEO-5` | `\EUMETCast\received\bas\E1B-GEO-5` | `--hrit-dir` — Rapid Scan HRIT |
+
+`E1B-Info-Channel-1`, `E1B-Info-Channel-2` and `WWW-Channel` are also enabled;
+the first two are EUMETSAT service-announcement channels and the last is
+required by the client itself — none of the three are read by this viewer, but
+none are safe to disable either. Every other channel (`E1B-EPS-*`,
+`E1B-SAF-*`, `E1B-DCP-1`, `E1B-TPC-*`, and so on) stays commented out, so the
+client neither downloads nor stores data this viewer will never use.
+
+Drop the file into the client's configuration directory in place of its
+default `cast-client-channels.ini` (back up the original first), restart the
+client, and it will only receive `E1B-GEO-3`, `-4` and `-5` going forward. If
+your reception directory isn't `\EUMETCast\received\bas`, edit the
+`target_directory` lines to match before installing it — and update
+`--dir`/`--hrit-dir`/`--disc-dir` to the same paths, per above.
+
 ### Deleting data as it ages
 
 A receiver writes continuously and never tidies up after itself. `--retain-days`
