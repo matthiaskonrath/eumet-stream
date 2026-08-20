@@ -1,0 +1,131 @@
+name: Rust
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - name: macos-x86_64
+            os: macos-13
+            target: x86_64-apple-darwin
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Test
+        run: cargo test --release --locked --target ${{ matrix.target }}
+
+      # The SEVIRI HRIT layers need EUMETSAT's own wavelet decompressor
+      # alongside the binary; see tools/build-decompressor.ps1/.sh and the
+      # README's "The wavelet decompressor" section. Upstream only supports
+      # Windows, Linux and Solaris, so macOS artifacts ship without it (the
+      # NWC SAF layers still work there). Best-effort: a failure here (e.g.
+      # the vendor repo being unreachable) does not fail the build, it just
+      # leaves the decompressor out of this run's artifact.
+      - name: Build the SEVIRI decompressor (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        continue-on-error: true
+        run: tools/build-decompressor.ps1
+
+      - name: Build the SEVIRI decompressor (Linux)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: |
+          sudo apt-get update && sudo apt-get install -y build-essential
+          tools/build-decompressor.sh
+
+      - name: Build eumet-stream
+        run: cargo build --release --locked --bin eumet-stream --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          set -eu
+          dir="eumet-stream-${{ matrix.name }}"
+          mkdir "$dir"
+          cp "target/${{ matrix.target }}/release/eumet-stream" "$dir/"
+          cp README.md LICENSE "$dir/"
+          if [ -f tools/xRITDecompress ]; then
+            cp tools/xRITDecompress "$dir/"
+          fi
+          tar czf "$dir.tar.gz" "$dir"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = "eumet-stream-${{ matrix.name }}"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/eumet-stream.exe" $dir
+          Copy-Item README.md, LICENSE $dir
+          if (Test-Path "tools/xRITDecompress.exe") {
+            Copy-Item "tools/xRITDecompress.exe" $dir
+          }
+          Compress-Archive -Path $dir -DestinationPath "$dir.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eumet-stream-${{ matrix.name }}
+          path: |
+            eumet-stream-${{ matrix.name }}.tar.gz
+            eumet-stream-${{ matrix.name }}.zip
+          if-no-files-found: ignore
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*/*
+          generate_release_notes: true
